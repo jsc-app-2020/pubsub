@@ -14,7 +14,7 @@ import (
 
 var upgrader = websocket.Upgrader{}
 
-var sessions = make(map[string]chan string)
+var sessions = make(map[string]chan interface{})
 
 func socketHandler(topic string, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -37,7 +37,7 @@ func socketHandler(topic string, w http.ResponseWriter, r *http.Request) {
 	}()
 
 	session := topic
-	channel := make(chan string)
+	channel := make(chan interface{})
 	sessions[session] = channel
 
 	defer delete(sessions, session)
@@ -51,7 +51,11 @@ func socketHandler(topic string, w http.ResponseWriter, r *http.Request) {
 			listening = false
 
 		case message := <-channel:
-			conn.WriteMessage(websocket.TextMessage, []byte(message))
+			if bytes, ok := message.([]byte); ok {
+				conn.WriteMessage(websocket.BinaryMessage, bytes)
+			} else if str, ok := message.(string); ok {
+				conn.WriteMessage(websocket.TextMessage, []byte(str))
+			}
 		}
 	}
 
@@ -68,7 +72,13 @@ func pubHandler(c *gin.Context) {
 	}
 
 	if session, ok := sessions[topic]; ok {
-		session <- string(bytes)
+		contentType := c.Request.Header.Get("content-type")
+		if contentType == "application/json" {
+			session <- string(bytes)
+		} else {
+			session <- bytes
+		}
+
 		c.Status(200)
 		return
 	}
@@ -90,6 +100,11 @@ func main() {
 	r.POST("/pub/:topic", pubHandler)
 	r.GET("sub/:topic", func(ctx *gin.Context) {
 		topic := ctx.Param("topic")
+		if _, ok := sessions[topic]; ok {
+			ctx.JSON(401, gin.H{"error": "Topic already used"})
+			return
+		}
+
 		socketHandler(topic, ctx.Writer, ctx.Request)
 	})
 
