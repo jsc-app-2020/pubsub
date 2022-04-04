@@ -1,4 +1,4 @@
-module xetia.io/auth_gateway
+module xetia.io/pubsub
 
 go 1.17
 

@@ -1,8 +1,7 @@
 package main
 
 import (
-	"crypto/rand"
-	"fmt"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -17,17 +16,7 @@ var upgrader = websocket.Upgrader{}
 
 var sessions = make(map[string]chan string)
 
-func generateSession() string {
-	n := 16
-	b := make([]byte, n)
-	if _, err := rand.Read(b); err != nil {
-		panic(err)
-	}
-	s := fmt.Sprintf("%X", b)
-	return s
-}
-
-func socketHandler(id string, w http.ResponseWriter, r *http.Request) {
+func socketHandler(topic string, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Print("Error during connection upgradation:", err)
@@ -47,32 +36,12 @@ func socketHandler(id string, w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	session := id
-	if session == "" {
-		// generate session and store channel
-		session = generateSession()
-	}
-
+	session := topic
 	channel := make(chan string)
 	sessions[session] = channel
 
 	defer delete(sessions, session)
 	defer close(channel)
-
-	type msg struct {
-		Type string `json:"type"`
-		Data string `json:"data"`
-	}
-	sessionData := msg{
-		Type: "session",
-		Data: session,
-	}
-
-	err = conn.WriteJSON(sessionData)
-	if err != nil {
-		log.Print("Error during sending session:", err)
-		return
-	}
 
 	// listening channel
 	listening := true
@@ -108,18 +77,17 @@ func pubHandler(c *gin.Context) {
 }
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
+	if _, err := os.Stat(".env"); !errors.Is(err, os.ErrNotExist) {
+		err := godotenv.Load()
+		if err != nil {
+			log.Fatal("Error loading .env file")
+		}
 	}
+
 	gin.SetMode(gin.ReleaseMode)
 
 	r := gin.Default()
 	r.POST("/pub/:topic", pubHandler)
-	r.GET("/sub", func(c *gin.Context) {
-		socketHandler("", c.Writer, c.Request)
-	})
-
 	r.GET("sub/:topic", func(ctx *gin.Context) {
 		topic := ctx.Param("topic")
 		socketHandler(topic, ctx.Writer, ctx.Request)
