@@ -12,7 +12,11 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var upgrader = websocket.Upgrader{}
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
+}
 
 var sessions = make(map[string]chan interface{})
 
@@ -86,6 +90,19 @@ func pubHandler(c *gin.Context) {
 	c.Status(404)
 }
 
+func cors(c *gin.Context) {
+	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+	c.Writer.Header().Set("Access-Control-Allow-Methods", "*")
+	c.Writer.Header().Set("Access-Control-Allow-Headers", "*")
+	c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+	if c.Request.Method == "OPTIONS" {
+		c.AbortWithStatus(204)
+		return
+	}
+
+	c.Next()
+}
+
 func main() {
 	if _, err := os.Stat(".env"); !errors.Is(err, os.ErrNotExist) {
 		err := godotenv.Load()
@@ -97,6 +114,8 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 
 	r := gin.Default()
+	r.Use(cors)
+
 	r.POST("/pub/:topic", pubHandler)
 	r.GET("sub/:topic", func(ctx *gin.Context) {
 		topic := ctx.Param("topic")
