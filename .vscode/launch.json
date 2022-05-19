@@ -9,10 +9,7 @@
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${fileDirname}",
-            "env": {
-                "PORT": "9090",
-            },
+            "program": "${fileDirname}"
         }
     ]
 }

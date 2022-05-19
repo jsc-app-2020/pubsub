@@ -30,6 +30,8 @@ func socketHandler(topic string, w http.ResponseWriter, r *http.Request) {
 	defer conn.Close()
 	defer close(closed)
 
+	log.Println(topic, "listening")
+
 	go func() {
 		for {
 			_, _, err := conn.ReadMessage()
@@ -63,7 +65,7 @@ func socketHandler(topic string, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	log.Println("Disconnected")
+	log.Println(topic, "finished")
 }
 
 func pubHandler(c *gin.Context) {
@@ -128,5 +130,6 @@ func main() {
 	})
 
 	port := os.Getenv("PORT")
+	log.Println("Listening on port", port)
 	log.Fatal(r.Run(":" + port))
 }
