@@ -117,7 +117,7 @@ func main() {
 	r.Use(cors)
 
 	r.POST("/pub/:topic", pubHandler)
-	r.GET("sub/:topic", func(ctx *gin.Context) {
+	r.GET("/sub/:topic", func(ctx *gin.Context) {
 		topic := ctx.Param("topic")
 		if _, ok := sessions[topic]; ok {
 			ctx.JSON(401, gin.H{"error": "Topic already used"})
